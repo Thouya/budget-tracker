@@ -3,8 +3,9 @@
 // user's real account names / category keys in the prompt means Claude
 // references identifiers that will actually resolve on import.
 
-export function buildExportPrompt(data) {
+export function buildExportPrompt(data, options = {}) {
   const { accounts, categories } = data;
+  const { accountName, periodFrom, periodTo } = options;
 
   const accountList = accounts.length
     ? accounts.map((a) => `- "${a.name}"`).join("\n")
@@ -15,11 +16,18 @@ export function buildExportPrompt(data) {
     .map((c) => `- ${c.key} (${c.label})`)
     .join("\n");
 
+  const accountSection = accountName
+    ? `Compte concerné : "${accountName}" — mets "account": "${accountName}" sur toutes les lignes (ou omets carrément le champ, l'app appliquera ce compte par défaut à l'import).`
+    : `Comptes existants (utilise exactement l'un de ces noms dans le champ "account" de chaque ligne) :\n${accountList}`;
+
+  const periodSection = periodFrom || periodTo
+    ? `\nPériode concernée : du ${periodFrom || "…"} au ${periodTo || "…"}. Toutes les dates extraites doivent tomber dans cette plage — si une date sur la capture semble en dehors, signale-le-moi au lieu de deviner.\n`
+    : "";
+
   return `Je gère mon budget avec une app perso. Je vais te montrer des captures d'écran de virements ou de relevés bancaires : à chaque fois, extrais les lignes et réponds UNIQUEMENT avec un objet JSON valide (pas de texte autour, pas de bloc markdown), au format ci-dessous, que je collerai directement dans la zone d'import de l'app.
 
-Comptes existants (utilise exactement ces noms dans le champ "account") :
-${accountList}
-
+${accountSection}
+${periodSection}
 Catégories existantes (utilise exactement ces clés dans le champ "category", uniquement pour les dépenses) :
 ${categoryList}
 
@@ -31,8 +39,7 @@ Format JSON attendu :
       "label": "Libellé court et clair",
       "amount": 12.34,
       "type": "depense",
-      "category": "courses",
-      "account": "Nom exact du compte"
+      "category": "courses"${accountName ? "" : ',\n      "account": "Nom exact du compte"'}
     }
   ]
 }
@@ -59,4 +66,32 @@ export function parseImportJson(text) {
     throw new Error("Le JSON doit être un objet avec des clés comme \"transactions\", \"subscriptions\", etc.");
   }
   return parsed;
+}
+
+const DATED_LISTS = ["transactions", "subscriptions", "installments"];
+const ACCOUNT_FIELD = { transactions: "account", subscriptions: "account", installments: "account" };
+
+/** Fill in a default account on rows that omit it, and drop rows whose date
+ * falls outside the chosen period (installments use next_date). Returns the
+ * adjusted payload plus a count of rows dropped for being out of range. */
+export function applyImportDefaults(payload, { defaultAccount, periodFrom, periodTo }) {
+  const out = { ...payload };
+  let outOfRange = 0;
+
+  for (const key of DATED_LISTS) {
+    if (!Array.isArray(payload[key])) continue;
+    const field = ACCOUNT_FIELD[key];
+    out[key] = payload[key]
+      .map((row) => (defaultAccount && !row[field] ? { ...row, [field]: defaultAccount } : row))
+      .filter((row) => {
+        if (!periodFrom && !periodTo) return true;
+        const dateStr = key === "installments" ? row.next_date : row.date;
+        if (!dateStr) return true; // nothing to check against, let the server validate
+        if (periodFrom && dateStr < periodFrom) { outOfRange++; return false; }
+        if (periodTo && dateStr > periodTo) { outOfRange++; return false; }
+        return true;
+      });
+  }
+
+  return { payload: out, outOfRange };
 }

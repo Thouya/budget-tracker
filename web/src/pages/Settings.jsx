@@ -3,7 +3,7 @@ import { color, font } from "../lib/theme.js";
 import { fmt0 } from "../lib/theme.js";
 import { Card, Avatar, PrimaryButton } from "../components/ui.jsx";
 import { api } from "../lib/api.js";
-import { buildExportPrompt, parseImportJson } from "../lib/importExport.js";
+import { buildExportPrompt, parseImportJson, applyImportDefaults } from "../lib/importExport.js";
 
 const inputStyle = { width: "100%", border: `1.5px solid ${color.border}`, background: "#fff", borderRadius: 10, padding: "9px 10px", fontFamily: font.body, fontSize: 13.5, color: color.ink, outline: "none" };
 const ACCOUNT_EMOJIS = ["🏦", "💙", "📈", "💰", "🐷", "💳"];
@@ -231,6 +231,10 @@ function CategoryRow({ category, reload }) {
 }
 
 function ImportExportSettings({ data, reload }) {
+  const [accountName, setAccountName] = useState(data.accounts[0]?.name ?? "");
+  const [periodFrom, setPeriodFrom] = useState("");
+  const [periodTo, setPeriodTo] = useState("");
+
   const [promptOpen, setPromptOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [copied, setCopied] = useState(false);
@@ -239,8 +243,10 @@ function ImportExportSettings({ data, reload }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
+  const scope = { accountName: accountName || null, periodFrom: periodFrom || null, periodTo: periodTo || null };
+
   function openPrompt() {
-    setPrompt(buildExportPrompt(data));
+    setPrompt(buildExportPrompt(data, scope));
     setPromptOpen(true);
     setCopied(false);
   }
@@ -264,10 +270,15 @@ function ImportExportSettings({ data, reload }) {
       setError(e.message);
       return;
     }
+    const { payload: adjusted, outOfRange } = applyImportDefaults(payload, {
+      defaultAccount: accountName || null,
+      periodFrom: periodFrom || null,
+      periodTo: periodTo || null,
+    });
     setImporting(true);
     try {
-      const res = await api.import(payload);
-      setResult(res);
+      const res = await api.import(adjusted);
+      setResult({ ...res, outOfRange });
       setImportText("");
       reload();
     } catch (e) {
@@ -280,6 +291,28 @@ function ImportExportSettings({ data, reload }) {
   return (
     <>
       <SectionLabel>Import / Export</SectionLabel>
+
+      <Card style={{ padding: 16, marginBottom: 12 }}>
+        <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink, marginBottom: 4 }}>Cadrage (optionnel)</div>
+        <div style={{ fontFamily: font.body, fontSize: 12, color: color.mutedLight, lineHeight: 1.4, marginBottom: 10 }}>
+          Choisis un compte et/ou une période pour cibler l'export et l'import ci-dessous : le compte s'applique par défaut à toutes les lignes qui ne le précisent pas, la période filtre ce qui est importé.
+        </div>
+        <FieldRow label="Compte">
+          <select value={accountName} onChange={(e) => setAccountName(e.target.value)} style={inputStyle}>
+            <option value="">Tous les comptes (préciser à chaque ligne)</option>
+            {data.accounts.map((a) => <option key={a.id} value={a.name}>{a.name}</option>)}
+          </select>
+        </FieldRow>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <FieldRow label="Du"><input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} style={inputStyle} /></FieldRow>
+          </div>
+          <div style={{ flex: 1 }}>
+            <FieldRow label="Au"><input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} style={inputStyle} /></FieldRow>
+          </div>
+        </div>
+      </Card>
+
       <Card style={{ padding: 16, marginBottom: 12 }}>
         <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink, marginBottom: 4 }}>
           Exporter un prompt pour Claude
@@ -309,7 +342,7 @@ function ImportExportSettings({ data, reload }) {
       <Card style={{ padding: 16, marginBottom: 20 }}>
         <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink, marginBottom: 4 }}>Importer du JSON</div>
         <div style={{ fontFamily: font.body, fontSize: 12, color: color.mutedLight, lineHeight: 1.4, marginBottom: 10 }}>
-          Colle ici le JSON généré par Claude (ou écrit à la main) — accepte <code>transactions</code>, <code>subscriptions</code>, <code>installments</code>, <code>accounts</code>, <code>categories</code>.
+          Colle ici le JSON généré par Claude (ou écrit à la main) — accepte <code>transactions</code>, <code>subscriptions</code>, <code>installments</code>, <code>accounts</code>, <code>categories</code>. Le compte et la période choisis ci-dessus s'appliquent automatiquement.
         </div>
         <textarea
           value={importText}
@@ -326,6 +359,7 @@ function ImportExportSettings({ data, reload }) {
             {result.categoriesUpdated > 0 && <div>{result.categoriesUpdated} budget(s) de catégorie mis à jour</div>}
             {result.subscriptionsAdded > 0 && <div>{result.subscriptionsAdded} abonnement(s) ajouté(s)</div>}
             {result.installmentsAdded > 0 && <div>{result.installmentsAdded} échéance(s) ajoutée(s)</div>}
+            {result.outOfRange > 0 && <div>{result.outOfRange} ligne(s) ignorée(s) car hors de la période choisie</div>}
             {!result.transactionsAdded && !result.accountsCreated && !result.categoriesUpdated && !result.subscriptionsAdded && !result.installmentsAdded && <div>Rien à importer trouvé dans ce JSON.</div>}
             {result.errors?.length > 0 && (
               <div style={{ marginTop: 6, color: color.orangeDeep }}>
