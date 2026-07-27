@@ -4,7 +4,7 @@
 // references identifiers that will actually resolve on import.
 
 export function buildExportPrompt(data, options = {}) {
-  const { accounts, categories } = data;
+  const { accounts, categories, transactions = [] } = data;
   const { accountName, periodFrom, periodTo } = options;
 
   const accountList = accounts.length
@@ -24,13 +24,29 @@ export function buildExportPrompt(data, options = {}) {
     ? `\nPériode concernée : du ${periodFrom || "…"} au ${periodTo || "…"}. Toutes les dates extraites doivent tomber dans cette plage — si une date sur la capture semble en dehors, signale-le-moi au lieu de deviner.\n`
     : "";
 
+  const matching = transactions.filter((t) => {
+    if (accountName && t.account_name !== accountName) return false;
+    if (periodFrom && t.date < periodFrom) return false;
+    if (periodTo && t.date > periodTo) return false;
+    return true;
+  });
+  const historyRows = matching.map((t) => ({
+    date: t.date,
+    label: t.label,
+    amount: Math.abs(t.amount),
+    type: t.type,
+    category: t.category_key || undefined,
+    account: t.account_name,
+  }));
+  const historySection = `\nHistorique déjà enregistré dans l'app pour ce cadrage (${historyRows.length} opération${historyRows.length > 1 ? "s" : ""}, pour référence — sers-t'en pour éviter de me redonner en double une ligne déjà là, et pour répondre si je te demande une analyse) :\n${historyRows.length ? JSON.stringify(historyRows) : "(aucune opération enregistrée pour ce compte/cette période)"}\n`;
+
   return `Je gère mon budget avec une app perso. Je vais te montrer des captures d'écran de virements ou de relevés bancaires : à chaque fois, extrais les lignes et réponds UNIQUEMENT avec un objet JSON valide (pas de texte autour, pas de bloc markdown), au format ci-dessous, que je collerai directement dans la zone d'import de l'app.
 
 ${accountSection}
 ${periodSection}
 Catégories existantes (utilise exactement ces clés dans le champ "category", uniquement pour les dépenses) :
 ${categoryList}
-
+${historySection}
 Format JSON attendu :
 {
   "transactions": [
