@@ -3,7 +3,7 @@ import { fmt, fmt0 } from "../lib/theme.js";
 import { Card, SectionTitle, ProgressBar, Avatar, EmptyState } from "../components/ui.jsx";
 import { accountTone, categorySpend, monthKey } from "../lib/calc.js";
 
-export default function Home({ data, sims, onOpenSettings, onGoTab }) {
+export default function Home({ data, sims, onOpenSettings, onGoTab, onSelectAccount }) {
   const { accounts, categories, transactions, settings } = data;
 
   if (!accounts.length) {
@@ -76,19 +76,28 @@ export default function Home({ data, sims, onOpenSettings, onGoTab }) {
       </SectionTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {accounts.map((a) => (
-          <Card key={a.id} style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 13 }}>
-            <Avatar bg={a.soft} size={40} radius={12} fontSize={19}>{a.emoji}</Avatar>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 14, color: color.ink }}>{a.name}</div>
-              <div style={{ fontFamily: font.body, fontWeight: 500, fontSize: 12, color: color.mutedLight }}>{a.bank}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 17, color: accountTone(a.balance, a.seuil ?? settings.seuil) }}>{fmt(a.balance)}</div>
-              {!!a.watch_overdraft && sims[a.id]?.alert?.active && (
-                <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 10.5, color: color.red }}>⚠ à surveiller</div>
-              )}
-            </div>
-          </Card>
+          <button
+            key={a.id}
+            onClick={() => {
+              onSelectAccount(a.id);
+              onGoTab("comptes");
+            }}
+            style={{ display: "block", width: "100%", textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer" }}
+          >
+            <Card style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 13 }}>
+              <Avatar bg={a.soft} size={40} radius={12} fontSize={19}>{a.emoji}</Avatar>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 14, color: color.ink }}>{a.name}</div>
+                <div style={{ fontFamily: font.body, fontWeight: 500, fontSize: 12, color: color.mutedLight }}>{a.bank}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 17, color: accountTone(a.balance, a.seuil ?? settings.seuil) }}>{fmt(a.balance)}</div>
+                {!!a.watch_overdraft && sims[a.id]?.alert?.active && (
+                  <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 10.5, color: color.red }}>⚠ à surveiller</div>
+                )}
+              </div>
+            </Card>
+          </button>
         ))}
       </div>
 

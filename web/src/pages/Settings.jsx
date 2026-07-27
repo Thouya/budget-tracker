@@ -3,6 +3,7 @@ import { color, font } from "../lib/theme.js";
 import { fmt0 } from "../lib/theme.js";
 import { Card, Avatar, PrimaryButton } from "../components/ui.jsx";
 import { api } from "../lib/api.js";
+import { buildExportPrompt, parseImportJson } from "../lib/importExport.js";
 
 const inputStyle = { width: "100%", border: `1.5px solid ${color.border}`, background: "#fff", borderRadius: 10, padding: "9px 10px", fontFamily: font.body, fontSize: 13.5, color: color.ink, outline: "none" };
 const ACCOUNT_EMOJIS = ["🏦", "💙", "📈", "💰", "🐷", "💳"];
@@ -27,6 +28,7 @@ export default function Settings({ data, reload, onClose, onLogout }) {
       <GeneralSettings settings={settings} reload={reload} />
       <AccountsSettings accounts={accounts} reload={reload} />
       <CategoriesSettings categories={categories} reload={reload} />
+      <ImportExportSettings data={data} reload={reload} />
 
       <button
         onClick={onLogout}
@@ -225,6 +227,118 @@ function CategoryRow({ category, reload }) {
       />
       <span style={{ fontFamily: font.body, fontSize: 12, color: color.faint }}>€/mois</span>
     </div>
+  );
+}
+
+function ImportExportSettings({ data, reload }) {
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  function openPrompt() {
+    setPrompt(buildExportPrompt(data));
+    setPromptOpen(true);
+    setCopied(false);
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+    } catch {
+      setError("Impossible de copier automatiquement — sélectionne le texte à la main.");
+    }
+  }
+
+  async function runImport() {
+    setError("");
+    setResult(null);
+    let payload;
+    try {
+      payload = parseImportJson(importText);
+    } catch (e) {
+      setError(e.message);
+      return;
+    }
+    setImporting(true);
+    try {
+      const res = await api.import(payload);
+      setResult(res);
+      setImportText("");
+      reload();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel>Import / Export</SectionLabel>
+      <Card style={{ padding: 16, marginBottom: 12 }}>
+        <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink, marginBottom: 4 }}>
+          Exporter un prompt pour Claude
+        </div>
+        <div style={{ fontFamily: font.body, fontSize: 12, color: color.mutedLight, lineHeight: 1.4, marginBottom: 10 }}>
+          Génère un texte à coller dans une conversation Claude : montre-lui ensuite tes captures d'écran de virements, il te renverra du JSON prêt à importer ci-dessous.
+        </div>
+        {!promptOpen ? (
+          <button onClick={openPrompt} style={{ border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 700, fontSize: 13, padding: "10px 16px", borderRadius: 12, background: color.purple, color: "#fff" }}>
+            Générer le prompt
+          </button>
+        ) : (
+          <>
+            <textarea
+              readOnly
+              value={prompt}
+              rows={6}
+              style={{ width: "100%", border: `1.5px solid ${color.border}`, borderRadius: 10, padding: 10, fontFamily: "ui-monospace, monospace", fontSize: 11.5, color: color.inkSoft, background: color.surface, resize: "vertical", marginBottom: 8 }}
+            />
+            <button onClick={copyPrompt} style={{ border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 700, fontSize: 13, padding: "9px 14px", borderRadius: 12, background: copied ? color.greenSoft : color.purple, color: copied ? color.greenDark : "#fff" }}>
+              {copied ? "Copié ✓" : "Copier"}
+            </button>
+          </>
+        )}
+      </Card>
+
+      <Card style={{ padding: 16, marginBottom: 20 }}>
+        <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink, marginBottom: 4 }}>Importer du JSON</div>
+        <div style={{ fontFamily: font.body, fontSize: 12, color: color.mutedLight, lineHeight: 1.4, marginBottom: 10 }}>
+          Colle ici le JSON généré par Claude (ou écrit à la main) — accepte <code>transactions</code>, <code>subscriptions</code>, <code>installments</code>, <code>accounts</code>, <code>categories</code>.
+        </div>
+        <textarea
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+          rows={6}
+          placeholder='{ "transactions": [ ... ] }'
+          style={{ width: "100%", border: `1.5px solid ${color.border}`, borderRadius: 10, padding: 10, fontFamily: "ui-monospace, monospace", fontSize: 12, color: color.ink, background: "#fff", resize: "vertical", marginBottom: 10 }}
+        />
+        {error && <div style={{ color: color.red, fontFamily: font.body, fontSize: 12.5, marginBottom: 10 }}>{error}</div>}
+        {result && (
+          <div style={{ background: color.greenSoft, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontFamily: font.body, fontSize: 12.5, color: color.greenDark, lineHeight: 1.5 }}>
+            {result.transactionsAdded > 0 && <div>{result.transactionsAdded} transaction(s) ajoutée(s)</div>}
+            {result.accountsCreated > 0 && <div>{result.accountsCreated} compte(s) créé(s)</div>}
+            {result.categoriesUpdated > 0 && <div>{result.categoriesUpdated} budget(s) de catégorie mis à jour</div>}
+            {result.subscriptionsAdded > 0 && <div>{result.subscriptionsAdded} abonnement(s) ajouté(s)</div>}
+            {result.installmentsAdded > 0 && <div>{result.installmentsAdded} échéance(s) ajoutée(s)</div>}
+            {!result.transactionsAdded && !result.accountsCreated && !result.categoriesUpdated && !result.subscriptionsAdded && !result.installmentsAdded && <div>Rien à importer trouvé dans ce JSON.</div>}
+            {result.errors?.length > 0 && (
+              <div style={{ marginTop: 6, color: color.orangeDeep }}>
+                {result.errors.map((e, i) => <div key={i}>⚠ {e}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+        <PrimaryButton onClick={runImport} disabled={importing} style={{ padding: "10px 16px", fontSize: 13.5 }}>
+          {importing ? "…" : "Importer"}
+        </PrimaryButton>
+      </Card>
+    </>
   );
 }
 

@@ -14,6 +14,7 @@ import categoriesRoutes from "./routes/categories.js";
 import transactionsRoutes from "./routes/transactions.js";
 import subscriptionsRoutes from "./routes/subscriptions.js";
 import installmentsRoutes from "./routes/installments.js";
+import importRoutes from "./routes/import.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/categories", categoriesRoutes);
 app.use("/api/transactions", transactionsRoutes);
 app.use("/api/subscriptions", subscriptionsRoutes);
 app.use("/api/installments", installmentsRoutes);
+app.use("/api/import", importRoutes);
 
 const webDist = path.join(__dirname, "..", "..", "web", "dist");
 if (fs.existsSync(webDist)) {

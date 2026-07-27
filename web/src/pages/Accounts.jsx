@@ -1,12 +1,11 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { color, font } from "../lib/theme.js";
 import { fmt, fmt0 } from "../lib/theme.js";
 import { Card, Avatar, Pill, EmptyState } from "../components/ui.jsx";
 import { accountTone, gaugeWidth } from "../lib/calc.js";
 
-export default function Accounts({ data, sims, onOpenSettings }) {
+export default function Accounts({ data, sims, onOpenSettings, selected, onSelect }) {
   const { accounts, transactions, settings } = data;
-  const [selected, setSelected] = useState(accounts[0]?.id ?? null);
   const activeId = accounts.some((a) => a.id === selected) ? selected : accounts[0]?.id;
 
   const history = useMemo(() => transactions.filter((t) => t.account_id === activeId), [transactions, activeId]);
@@ -43,7 +42,7 @@ export default function Accounts({ data, sims, onOpenSettings }) {
         return (
           <button
             key={a.id}
-            onClick={() => setSelected(a.id)}
+            onClick={() => onSelect(a.id)}
             style={{
               display: "block", width: "100%", textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer",
               marginBottom: 16,

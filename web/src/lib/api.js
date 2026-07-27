@@ -67,4 +67,5 @@ export const api = {
     update: (id, data) => put(`/installments/${id}`, data),
     remove: (id) => del(`/installments/${id}`),
   },
+  import: (payload) => post("/import", payload),
 };

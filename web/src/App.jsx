@@ -20,6 +20,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
 
   const loadData = useCallback(async () => {
     const [accounts, categories, transactions, subscriptions, installments, settings] = await Promise.all([
@@ -119,8 +120,8 @@ export default function App() {
           <Settings data={data} reload={loadData} onClose={() => setSettingsOpen(false)} onLogout={handleLogout} />
         ) : (
           <>
-            {tab === "accueil" && <Home data={data} sims={sims} onOpenSettings={() => setSettingsOpen(true)} onGoTab={setTab} />}
-            {tab === "comptes" && <Accounts data={data} sims={sims} onOpenSettings={() => setSettingsOpen(true)} />}
+            {tab === "accueil" && <Home data={data} sims={sims} onOpenSettings={() => setSettingsOpen(true)} onGoTab={setTab} onSelectAccount={setSelectedAccountId} />}
+            {tab === "comptes" && <Accounts data={data} sims={sims} onOpenSettings={() => setSettingsOpen(true)} selected={selectedAccountId} onSelect={setSelectedAccountId} />}
             {tab === "prevoir" && <Forecast data={data} sims={sims} reload={loadData} />}
             {tab === "plan" && <Plan data={data} />}
           </>
