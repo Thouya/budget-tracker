@@ -1,0 +1,16 @@
+services:
+  budget-tracker:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in your .env file}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in your .env file}
+      PORT: 3000
+      DISABLE_SECURE_COOKIE: ${DISABLE_SECURE_COOKIE:-}
+    volumes:
+      - budget-data:/app/server/data
+
+volumes:
+  budget-data:

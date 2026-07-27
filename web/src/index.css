@@ -1,0 +1,18 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #F1E7DA;
+  font-family: 'Figtree', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #2A241E;
+}
+a { color: #17B890; text-decoration: none; }
+a:hover { color: #12997a; }
+button { font: inherit; }
+input { font: inherit; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
