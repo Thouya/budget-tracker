@@ -15,7 +15,6 @@ COPY --from=web-build /app/web/dist /app/web/dist
 
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/server/data
-VOLUME ["/app/server/data"]
 EXPOSE 3000
 
 CMD ["node", "src/index.js"]
