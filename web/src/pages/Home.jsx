@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { color, font } from "../lib/theme.js";
 import { fmt, fmt0 } from "../lib/theme.js";
 import { Card, SectionTitle, ProgressBar, Avatar, EmptyState } from "../components/ui.jsx";
-import { accountTone, categorySpend, monthKey } from "../lib/calc.js";
+import { accountTone, categorySpend, monthKey, monthLabel as formatMonthLabel, shiftMonth } from "../lib/calc.js";
 
 export default function Home({ data, sims, onOpenSettings, onGoTab, onSelectAccount }) {
   const { accounts, categories, transactions, settings } = data;
+  const currentMonth = monthKey();
+  const [budgetMonth, setBudgetMonth] = useState(currentMonth);
 
   if (!accounts.length) {
     return (
@@ -17,12 +20,11 @@ export default function Home({ data, sims, onOpenSettings, onGoTab, onSelectAcco
 
   const alertingAccount = accounts.find((a) => a.watch_overdraft && sims[a.id]?.alert?.active);
 
-  const spendById = categorySpend(transactions, categories);
+  const spendById = categorySpend(transactions, categories, budgetMonth);
   const spendCats = categories.filter((c) => c.key !== "salaire");
   const spentTotal = spendCats.reduce((a, c) => a + (c.key === "epargne" ? 0 : spendById[c.id] || 0), 0);
 
   const recent = transactions.slice(0, 4);
-  const monthLabel = new Date().toLocaleDateString("fr-FR", { month: "long" });
 
   return (
     <div style={{ animation: "fadeUp .35s ease both" }}>
@@ -101,9 +103,29 @@ export default function Home({ data, sims, onOpenSettings, onGoTab, onSelectAcco
         ))}
       </div>
 
-      <SectionTitle action={<a onClick={() => onGoTab("plan")} style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13, color: color.green, cursor: "pointer" }}>Plan →</a>}>
-        Budget de {monthLabel}
-      </SectionTitle>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "22px 2px 12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => setBudgetMonth((m) => shiftMonth(m, -1))}
+            aria-label="Mois précédent"
+            style={{ border: "none", background: color.line, borderRadius: 8, width: 24, height: 24, cursor: "pointer", color: color.inkSoft, fontFamily: font.body, fontWeight: 700, fontSize: 13, lineHeight: 1 }}
+          >
+            ‹
+          </button>
+          <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 17, color: color.ink, minWidth: 118, textAlign: "center" }}>
+            {budgetMonth === currentMonth ? "Budget de ce mois" : formatMonthLabel(budgetMonth)}
+          </div>
+          <button
+            onClick={() => setBudgetMonth((m) => shiftMonth(m, 1))}
+            disabled={budgetMonth >= currentMonth}
+            aria-label="Mois suivant"
+            style={{ border: "none", background: color.line, borderRadius: 8, width: 24, height: 24, cursor: budgetMonth >= currentMonth ? "default" : "pointer", color: budgetMonth >= currentMonth ? color.faint : color.inkSoft, fontFamily: font.body, fontWeight: 700, fontSize: 13, lineHeight: 1, opacity: budgetMonth >= currentMonth ? 0.5 : 1 }}
+          >
+            ›
+          </button>
+        </div>
+        <a onClick={() => onGoTab("plan")} style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13, color: color.green, cursor: "pointer" }}>Plan →</a>
+      </div>
       <Card style={{ padding: "8px 16px" }}>
         {spendCats.map((c) => {
           const spent = spendById[c.id] || 0;
@@ -122,7 +144,7 @@ export default function Home({ data, sims, onOpenSettings, onGoTab, onSelectAcco
           );
         })}
         <div style={{ padding: "12px 2px", display: "flex", justifyContent: "space-between", fontFamily: font.body, fontWeight: 600, fontSize: 13, color: color.muted }}>
-          <span>Dépensé ce mois</span>
+          <span>{budgetMonth === currentMonth ? "Dépensé ce mois" : "Dépensé ce mois-là"}</span>
           <span style={{ fontFamily: font.display, color: color.ink }}>{fmt(spentTotal)}</span>
         </div>
       </Card>

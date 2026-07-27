@@ -138,6 +138,53 @@ export function accountAlert({ account, simulation, seuil, anticipationDays, tod
   return { active: false, text: "", sub: "" };
 }
 
+export function monthLabel(mk) {
+  const [y, m] = mk.split("-").map(Number);
+  const d = new Date(y, m - 1, 1);
+  const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+export function shiftMonth(mk, delta) {
+  const [y, m] = mk.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return monthKey(d);
+}
+
+/** Every "YYYY-MM" that has at least one transaction, most recent first. */
+export function monthsWithData(transactions) {
+  const set = new Set(transactions.map((t) => t.date.slice(0, 7)));
+  return [...set].sort().reverse();
+}
+
+/** Revenu / dépenses / épargne / net for one month — the building block for
+ * the evolution/KPI view (is spending trending down, is the savings rate
+ * trending up, month over month). */
+export function monthSummary(transactions, categories, mk) {
+  const epargneCat = categories.find((c) => c.key === "epargne");
+  let revenu = 0;
+  let depense = 0;
+  let epargne = 0;
+  for (const t of transactions) {
+    if (!t.date.startsWith(mk)) continue;
+    if (t.type === "revenu") {
+      revenu += t.amount;
+    } else {
+      const amt = Math.abs(t.amount);
+      depense += amt;
+      if (epargneCat && t.category_id === epargneCat.id) epargne += amt;
+    }
+  }
+  return {
+    month: mk,
+    revenu,
+    depense,
+    epargne,
+    net: revenu - depense,
+    savingsRate: revenu > 0 ? (epargne / revenu) * 100 : 0,
+  };
+}
+
 export function categorySpend(transactions, categories, mk = monthKey()) {
   const byId = {};
   for (const c of categories) byId[c.id] = 0;

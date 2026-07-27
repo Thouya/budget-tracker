@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { color, font } from "../lib/theme.js";
 import { fmt, fmt0 } from "../lib/theme.js";
 import { Card, Avatar, Pill, EmptyState } from "../components/ui.jsx";
-import { accountTone, gaugeWidth } from "../lib/calc.js";
+import { accountTone, gaugeWidth, monthLabel } from "../lib/calc.js";
 
 export default function Accounts({ data, sims, onOpenSettings, selected, onSelect }) {
   const { accounts, transactions, settings } = data;
@@ -10,6 +10,21 @@ export default function Accounts({ data, sims, onOpenSettings, selected, onSelec
 
   const history = useMemo(() => transactions.filter((t) => t.account_id === activeId), [transactions, activeId]);
   const activeAccount = accounts.find((a) => a.id === activeId);
+
+  const historyByMonth = useMemo(() => {
+    const groups = [];
+    let current = null;
+    for (const t of history) {
+      const mk = t.date.slice(0, 7);
+      if (!current || current.month !== mk) {
+        current = { month: mk, label: monthLabel(mk), items: [], net: 0 };
+        groups.push(current);
+      }
+      current.items.push(t);
+      current.net += t.amount;
+    }
+    return groups;
+  }, [history]);
 
   if (!accounts.length) {
     return (
@@ -86,27 +101,39 @@ export default function Accounts({ data, sims, onOpenSettings, selected, onSelec
       <div style={{ margin: "20px 4px 12px", fontFamily: font.display, fontWeight: 600, fontSize: 17, color: color.ink }}>
         Historique · {activeAccount?.name}
       </div>
-      <Card style={{ padding: "6px 16px" }}>
-        {history.length === 0 ? (
+      {historyByMonth.length === 0 ? (
+        <Card style={{ padding: "6px 16px" }}>
           <div style={{ padding: "16px 0", textAlign: "center", fontFamily: font.body, fontSize: 13, color: color.mutedLight }}>Pas encore d'opération sur ce compte.</div>
-        ) : (
-          history.map((t) => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: `1px solid ${color.line}` }}>
-              <Avatar bg={t.category_soft || color.line} size={36} radius={11} fontSize={16}>{t.category_emoji || "✨"}</Avatar>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink }}>{t.label}</div>
-                <div style={{ fontFamily: font.body, fontWeight: 500, fontSize: 11.5, color: color.mutedLight }}>
-                  {new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}
-                  {t.category_label ? ` · ${t.category_label}` : ""}
-                </div>
-              </div>
-              <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 15, color: t.amount < 0 ? color.ink : color.green, flex: "none" }}>
-                {(t.amount < 0 ? "−" : "+") + Math.abs(t.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"}
+        </Card>
+      ) : (
+        historyByMonth.map((group) => (
+          <div key={group.month} style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "0 4px 8px" }}>
+              <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 12.5, color: color.mutedLight, textTransform: "uppercase", letterSpacing: ".02em" }}>{group.label}</div>
+              <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 12, color: group.net < 0 ? color.inkSoft : color.greenDark }}>
+                net {(group.net < 0 ? "−" : "+") + Math.abs(group.net).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"}
               </div>
             </div>
-          ))
-        )}
-      </Card>
+            <Card style={{ padding: "6px 16px" }}>
+              {group.items.map((t) => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: `1px solid ${color.line}` }}>
+                  <Avatar bg={t.category_soft || color.line} size={36} radius={11} fontSize={16}>{t.category_emoji || "✨"}</Avatar>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink }}>{t.label}</div>
+                    <div style={{ fontFamily: font.body, fontWeight: 500, fontSize: 11.5, color: color.mutedLight }}>
+                      {new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }).replace(".", "")}
+                      {t.category_label ? ` · ${t.category_label}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 15, color: t.amount < 0 ? color.ink : color.green, flex: "none" }}>
+                    {(t.amount < 0 ? "−" : "+") + Math.abs(t.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"}
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </div>
+        ))
+      )}
     </div>
   );
 }

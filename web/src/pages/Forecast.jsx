@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { color, font } from "../lib/theme.js";
 import { fmt, fmt0 } from "../lib/theme.js";
 import { Card, Avatar, EmptyState } from "../components/ui.jsx";
-import { monthsForecast, frenchDate, todayISO } from "../lib/calc.js";
+import { monthsForecast, frenchDate, todayISO, monthsWithData, monthSummary, monthLabel } from "../lib/calc.js";
 import { api } from "../lib/api.js";
 
 const SEGMENTS = [
@@ -10,11 +10,12 @@ const SEGMENTS = [
   { key: "abos", label: "Abos" },
   { key: "ech", label: "Échéances" },
   { key: "annee", label: "Année" },
+  { key: "evolution", label: "Évolution" },
 ];
 
 export default function Forecast({ data, sims, reload }) {
   const [seg, setSeg] = useState("mois");
-  const { accounts, categories, subscriptions, installments, settings } = data;
+  const { accounts, categories, transactions, subscriptions, installments, settings } = data;
 
   if (!accounts.length) {
     return (
@@ -31,7 +32,7 @@ export default function Forecast({ data, sims, reload }) {
     <div style={{ animation: "fadeUp .35s ease both" }}>
       <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 22, color: color.ink, margin: "10px 4px 14px" }}>Anticiper</div>
 
-      <div style={{ display: "flex", gap: 7, background: color.track, borderRadius: 14, padding: 4, marginBottom: 18 }}>
+      <div style={{ display: "flex", gap: 7, background: color.track, borderRadius: 14, padding: 4, marginBottom: 18, overflowX: "auto" }}>
         {SEGMENTS.map((s) => {
           const active = seg === s.key;
           return (
@@ -39,7 +40,7 @@ export default function Forecast({ data, sims, reload }) {
               key={s.key}
               onClick={() => setSeg(s.key)}
               style={{
-                flex: 1, border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 700, fontSize: 12, padding: "9px 4px",
+                flex: "0 0 auto", minWidth: 68, border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 700, fontSize: 12, padding: "9px 4px",
                 borderRadius: 11, background: active ? "#fff" : "transparent", color: active ? color.green : color.muted,
                 boxShadow: active ? "0 3px 8px -3px rgba(60,40,20,.35)" : "none",
               }}
@@ -54,7 +55,116 @@ export default function Forecast({ data, sims, reload }) {
       {seg === "abos" && <SubsSeg accounts={accounts} subscriptions={subscriptions} reload={reload} />}
       {seg === "ech" && <InstallmentsSeg accounts={accounts} installments={installments} reload={reload} />}
       {seg === "annee" && <YearSeg categories={categories} subscriptions={subscriptions} installments={installments} salaire={settings.salaire} />}
+      {seg === "evolution" && <EvolutionSeg transactions={transactions} categories={categories} settings={settings} />}
     </div>
+  );
+}
+
+function EvolutionSeg({ transactions, categories, settings }) {
+  const months = useMemo(() => {
+    const keys = monthsWithData(transactions).slice(0, 12).reverse(); // oldest → newest, cap 12
+    return keys.map((mk) => monthSummary(transactions, categories, mk));
+  }, [transactions, categories]);
+
+  if (months.length < 2) {
+    return (
+      <Card style={{ padding: 24, textAlign: "center" }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+        <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 15, color: color.ink, marginBottom: 4 }}>Pas encore assez d'historique</div>
+        <div style={{ fontFamily: font.body, fontSize: 12.5, color: color.mutedLight, lineHeight: 1.4 }}>
+          Il faut au moins deux mois de données pour voir une évolution. Ajoute des opérations ou importe ton historique depuis les réglages.
+        </div>
+      </Card>
+    );
+  }
+
+  const maxAbsNet = Math.max(...months.map((m) => Math.abs(m.net)), 1);
+  const maxRate = Math.max(...months.map((m) => m.savingsRate), settings.savings_target_pct || 0, 1);
+  const reversedForList = [...months].reverse(); // newest first for the detail cards
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Card style={{ padding: 18 }}>
+        <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 12, color: color.mutedLight, marginBottom: 12 }}>SOLDE NET PAR MOIS (revenus − dépenses)</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {months.map((m) => (
+            <div key={m.month} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 58, flex: "none", fontFamily: font.body, fontWeight: 600, fontSize: 11, color: color.mutedLight, textTransform: "capitalize" }}>
+                {monthLabel(m.month).split(" ")[0].slice(0, 4)}
+              </div>
+              <div style={{ flex: 1, height: 16, borderRadius: 6, background: color.track, overflow: "hidden", position: "relative" }}>
+                <div
+                  style={{
+                    height: "100%", borderRadius: 6,
+                    width: `${Math.max(3, (Math.abs(m.net) / maxAbsNet) * 100)}%`,
+                    background: m.net >= 0 ? "#21C08A" : color.red,
+                  }}
+                />
+              </div>
+              <div style={{ width: 84, flex: "none", textAlign: "right", fontFamily: font.display, fontWeight: 600, fontSize: 13, color: m.net >= 0 ? color.greenDark : color.red }}>
+                {(m.net < 0 ? "−" : "+") + fmt0(m.net)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ padding: 18 }}>
+        <div style={{ fontFamily: font.body, fontWeight: 700, fontSize: 12, color: color.mutedLight, marginBottom: 12 }}>TAUX D'ÉPARGNE PAR MOIS</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {months.map((m) => (
+            <div key={m.month} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 58, flex: "none", fontFamily: font.body, fontWeight: 600, fontSize: 11, color: color.mutedLight, textTransform: "capitalize" }}>
+                {monthLabel(m.month).split(" ")[0].slice(0, 4)}
+              </div>
+              <div style={{ flex: 1, height: 16, borderRadius: 6, background: color.track, overflow: "hidden", position: "relative" }}>
+                <div style={{ height: "100%", borderRadius: 6, width: `${Math.max(3, (m.savingsRate / maxRate) * 100)}%`, background: color.teal }} />
+                {settings.savings_target_pct > 0 && (
+                  <div style={{ position: "absolute", top: -2, bottom: -2, left: `${Math.min(100, (settings.savings_target_pct / maxRate) * 100)}%`, width: 2, background: color.ink, opacity: 0.35 }} />
+                )}
+              </div>
+              <div style={{ width: 84, flex: "none", textAlign: "right", fontFamily: font.display, fontWeight: 600, fontSize: 13, color: color.ink }}>
+                {Math.round(m.savingsRate)}%
+              </div>
+            </div>
+          ))}
+        </div>
+        {settings.savings_target_pct > 0 && (
+          <div style={{ marginTop: 10, fontFamily: font.body, fontSize: 11, color: color.faint, textAlign: "right" }}>┊ cible {settings.savings_target_pct}%</div>
+        )}
+      </Card>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {reversedForList.map((m, i) => {
+          const prev = reversedForList[i + 1];
+          return (
+            <Card key={m.month} style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 14.5, color: color.ink }}>{monthLabel(m.month)}</div>
+                {prev && <DeltaPill value={m.net - prev.net} suffix=" €" />}
+              </div>
+              <div style={{ display: "flex", gap: 16, fontFamily: font.body, fontSize: 12.5 }}>
+                <div><span style={{ color: color.mutedLight }}>Revenus </span><b style={{ color: color.ink }}>{fmt0(m.revenu)}</b></div>
+                <div><span style={{ color: color.mutedLight }}>Dépenses </span><b style={{ color: color.ink }}>{fmt0(m.depense)}</b></div>
+                <div><span style={{ color: color.mutedLight }}>Épargne </span><b style={{ color: color.ink }}>{fmt0(m.epargne)}</b></div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DeltaPill({ value, suffix = "" }) {
+  if (Math.abs(value) < 0.5) {
+    return <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 11.5, color: color.mutedLight }}>= stable</span>;
+  }
+  const up = value > 0;
+  return (
+    <span style={{ fontFamily: font.body, fontWeight: 700, fontSize: 11.5, color: up ? "#12997a" : color.red, background: up ? color.greenSoft : color.redSoft, padding: "3px 8px", borderRadius: 8 }}>
+      {up ? "▲" : "▼"} {fmt0(Math.abs(value))}{suffix} vs mois précédent
+    </span>
   );
 }
 
