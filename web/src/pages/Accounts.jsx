@@ -96,10 +96,11 @@ export default function Accounts({ data, sims, onOpenSettings, selected, onSelec
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: color.ink }}>{t.label}</div>
                 <div style={{ fontFamily: font.body, fontWeight: 500, fontSize: 11.5, color: color.mutedLight }}>
-                  {new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }).replace(".", "")}
+                  {new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}
+                  {t.category_label ? ` · ${t.category_label}` : ""}
                 </div>
               </div>
-              <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 15, color: t.amount < 0 ? color.ink : color.green }}>
+              <div style={{ fontFamily: font.display, fontWeight: 600, fontSize: 15, color: t.amount < 0 ? color.ink : color.green, flex: "none" }}>
                 {(t.amount < 0 ? "−" : "+") + Math.abs(t.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"}
               </div>
             </div>

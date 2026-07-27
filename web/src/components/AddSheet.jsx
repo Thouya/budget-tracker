@@ -5,6 +5,7 @@ import { todayISO } from "../lib/calc.js";
 export default function AddSheet({ categories, accounts, defaultAccountId, onClose, onSave }) {
   const [ttype, setTtype] = useState("depense");
   const [amount, setAmount] = useState("");
+  const [label, setLabel] = useState("");
   const [catId, setCatId] = useState(categories.find((c) => c.key !== "salaire")?.id ?? null);
   const [accountId, setAccountId] = useState(defaultAccountId ?? accounts[0]?.id ?? null);
   const [error, setError] = useState("");
@@ -25,8 +26,9 @@ export default function AddSheet({ categories, accounts, defaultAccountId, onClo
     }
     setSaving(true);
     try {
+      const fallback = ttype === "revenu" ? "Entrée" : pickableCats.find((c) => c.id === catId)?.label || "Dépense";
       await onSave({
-        label: ttype === "revenu" ? "Entrée" : pickableCats.find((c) => c.id === catId)?.label || "Dépense",
+        label: label.trim() || fallback,
         category_id: ttype === "revenu" ? salaireCat?.id ?? null : catId,
         account_id: accountId,
         amount: amt,
@@ -101,6 +103,13 @@ export default function AddSheet({ categories, accounts, defaultAccountId, onClo
           />
           <span style={{ fontFamily: font.display, fontWeight: 600, fontSize: 28, color: color.faint }}>€</span>
         </div>
+
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder={ttype === "revenu" ? "Libellé (optionnel, ex. Prime, Remboursement…)" : "Libellé (optionnel, ex. Courses Lidl…)"}
+          style={{ width: "100%", border: `1.5px solid ${color.border}`, background: "#fff", borderRadius: 14, padding: "11px 14px", fontFamily: font.body, fontWeight: 500, fontSize: 13.5, color: color.ink, outline: "none", marginBottom: 14, boxSizing: "border-box" }}
+        />
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {[10, 20, 50].map((v) => (
